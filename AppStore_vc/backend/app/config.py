@@ -11,13 +11,28 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", "root")
     DB_NAME: str = os.getenv("DB_NAME", "appstore_vc")
     
-    APP_HOST: str = os.getenv("APP_HOST", "0.0.0.0")
-    APP_PORT: int = int(os.getenv("APP_PORT", "8000"))
-    APP_DEBUG: bool = bool(os.getenv("APP_DEBUG", "true"))
+    HOST: str = os.getenv("HOST", "0.0.0.0")
+    PORT: int = int(os.getenv("PORT", "8000"))
+    DEBUG: bool = bool(os.getenv("DEBUG", "true"))
     
-    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    OPENAI_API_BASE: str = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
+    APP_HOST: str = HOST
+    APP_PORT: int = PORT
+    APP_DEBUG: bool = DEBUG
+    
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    
+    SILICONFLOW_API_KEY: str = os.getenv("SILICONFLOW_API_KEY", "")
+    SILICONFLOW_BASE_URL: str = os.getenv("SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
+    EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
+    SILICONFLOW_LLM_MODEL: str = os.getenv("SILICONFLOW_LLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "siliconflow")
+    
+    NEO4J_URI: str = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    NEO4J_USER: str = os.getenv("NEO4J_USER", "neo4j")
+    NEO4J_PASSWORD: str = os.getenv("NEO4J_PASSWORD", "")
+    
+    CHROMADB_PATH: str = os.getenv("CHROMADB_PATH", "./chromadb")
     
     APP_STORE_COUNTRY: str = os.getenv("APP_STORE_COUNTRY", "us")
     REQUEST_DELAY: float = float(os.getenv("REQUEST_DELAY", "1.0"))

@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  line-height: 1.5;
+  font-weight: 400;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #eef2ff 0%, #fdf2f8 50%, #e0e7ff 100%);
+  background-attachment: fixed;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-lg rounded-2xl shadow-glass border border-white/50;
+  }
+
+  .glass-card-dark {
+    @apply bg-gray-900/70 backdrop-blur-lg rounded-2xl shadow-glass border border-gray-700/50;
+  }
+
+  .gradient-btn {
+    @apply bg-gradient-to-r from-primary-500 to-secondary-400 text-white font-medium rounded-xl px-6 py-3 hover:from-primary-600 hover:to-secondary-500 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105;
+  }
+
+  .gradient-btn-outline {
+    @apply border-2 border-primary-500 text-primary-600 font-medium rounded-xl px-6 py-3 hover:bg-primary-50 transition-all duration-300;
+  }
+
+  .input-glass {
+    @apply bg-white/60 backdrop-blur-md border border-white/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all duration-300;
+  }
+
+  .sidebar-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:text-primary-600 hover:bg-white/50 transition-all duration-300 cursor-pointer;
+  }
+
+  .sidebar-item-active {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-primary-500/20 to-secondary-400/20 text-primary-600 font-medium transition-all duration-300 cursor-pointer;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}

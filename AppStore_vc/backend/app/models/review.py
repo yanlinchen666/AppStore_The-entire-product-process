@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, Float, DateTime, JSON, Boolean
+from sqlalchemy import Column, Integer, String, Text, Float, DateTime, JSON, Boolean, ForeignKey
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 class Review(Base):
@@ -20,12 +21,14 @@ class Review(Base):
     source_url = Column(String(500), nullable=True)
     raw_data = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=func.now())
+    
+    cleaned_reviews = relationship("CleanedReview", back_populates="review")
 
 class CleanedReview(Base):
     __tablename__ = "cleaned_reviews"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    review_id = Column(Integer, nullable=False, index=True)
+    review_id = Column(Integer, ForeignKey("reviews.id"), nullable=False, index=True)
     app_id = Column(String(50), nullable=False, index=True)
     cleaned_content = Column(Text, nullable=False)
     language = Column(String(10), nullable=True)
@@ -35,3 +38,5 @@ class CleanedReview(Base):
     duplicate_of = Column(Integer, nullable=True)
     is_valid = Column(Boolean, default=True)
     processed_at = Column(DateTime, default=func.now())
+    
+    review = relationship("Review", back_populates="cleaned_reviews")
