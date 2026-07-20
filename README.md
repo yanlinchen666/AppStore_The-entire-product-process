@@ -18,7 +18,7 @@ Planning Assessment". See the assessment requirements in the repository root
 - **Conflict detection**: contradictory reviews are surfaced and counted.
 - **Full traceability chain**: Review → Finding → Requirement → Test Case, queryable via API and UI.
 - **Live progress UI**: every pipeline stage streams progress to the frontend (polling or SSE).
-- **JSON / CSV import**: supports externally provided review datasets (interviewer may supply unseen data).
+- **JSON / CSV import**: supports externally provided review datasets.
 - **Zombie run recovery**: backend startup auto-detects interrupted runs and marks them as failed.
 - **Cached sample output**: results viewable even without network access.
 
