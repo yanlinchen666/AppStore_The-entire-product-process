@@ -8,6 +8,7 @@ __pycache__/
 .env.*.local
 
 venv/
+.venv/
 .env/
 .pip/
 
@@ -34,8 +35,8 @@ Thumbs.db
 *.swo
 
 *.egg-info/
-dist/
-build/
 
 *.log
 *.tmp
+
+chromadb/

@@ -35,6 +35,7 @@ export const Analyze = () => {
         max_reviews: maxReviews,
       });
 
+      // Navigate to run detail page - it will show progress tracker while status === "running"
       navigate(`/runs/${response.run_id}`);
     } catch (err) {
       setError((err as Error).message);
@@ -141,13 +142,13 @@ export const Analyze = () => {
               className="w-full gradient-btn flex items-center justify-center gap-2"
             >
               {isLoading ? (
-                <Loading text="" size="small" />
+                <Loading key="loading" text="" size="small" />
               ) : (
-                <>
+                <span key="normal" className="flex items-center justify-center gap-2">
                   <Sparkles size={18} />
                   开始分析
                   <ArrowRight size={18} />
-                </>
+                </span>
               )}
             </button>
           </form>

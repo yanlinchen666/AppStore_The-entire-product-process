@@ -1,90 +1,225 @@
-# LaienTech iOS App Review Analysis and Version Planning Assessment
+# App Store Review Analysis System
 
-## Background
+> AI-driven analysis of iOS App Store reviews, turning user feedback into
+> actionable product requirements, version plans, and test cases — with full
+> traceability from review to test case.
 
-This assessment uses the following real iOS app as the primary development and demonstration example:
+This project implements the LaienTech "iOS App Review Analysis and Version
+Planning Assessment". See the assessment requirements in the repository root
+[README.md](file:///d:/AI/agent_vc/AppStore_vc/README.md).
 
-https://apps.apple.com/us/app/workout-for-women-home-gym/id839285684
+## ✨ Key Features
 
-If you have access to an overseas network environment, use the U.S. App Store link above. If not, and the U.S. link cannot be opened or redirects, use the China App Store link only to open the app detail page:
+- **Real data collection** from the US App Store via the iTunes RSS Customer Reviews API (no page scraping).
+- **Linear pipeline architecture** — 9 stages orchestrated by `AnalysisOrchestrator`, each stage has clear input/output and failure handling.
+- **Model-driven semantic analysis** using Qwen3-8B for topic discovery, finding generation, PRD writing, and test case design.
+- **Evidence validation** with BGE-M3 embeddings + ChromaDB: every finding is backed by real review evidence.
+- **Assumption marking**: conclusions without sufficient evidence (support count < 2 or confidence < 0.4) are explicitly flagged as assumptions, not silently kept.
+- **Conflict detection**: contradictory reviews are surfaced and counted.
+- **Full traceability chain**: Review → Finding → Requirement → Test Case, queryable via API and UI.
+- **Live progress UI**: every pipeline stage streams progress to the frontend (polling or SSE).
+- **JSON / CSV import**: supports externally provided review datasets (interviewer may supply unseen data).
+- **Zombie run recovery**: backend startup auto-detects interrupted runs and marks them as failed.
+- **Cached sample output**: results viewable even without network access.
 
-https://apps.apple.com/cn/app/workout-for-women-home-gym/id839285684
+## 🏗️ Architecture
 
-Regardless of which link is used to open the page, the review data used in this assessment must come from the U.S. App Store storefront.
-
-You are expected to complete a full product analysis workflow around App Store user reviews, covering data collection, review cleaning, review classification, issue analysis, version planning, PRD writing, and test case design. The final results should be presented through a runnable UI.
-
-This assessment focuses on the candidate's vibe coding ability. Candidates should use vibe coding to complete the full process: collecting data, cleaning and analyzing reviews, abstracting product requirements, planning versions, designing test cases, and productizing the analysis workflow into an interactive experience.
-
-## Objective
-
-Build a runnable tool or web application. In the UI, the user should be able to enter a valid U.S. App Store app link. Use the following link as the primary example:
-
-```text
-https://apps.apple.com/us/app/workout-for-women-home-gym/id839285684
+```
+User → Frontend (React + TS + Vite)
+         │  /api/*  (Vite dev proxy → :8000)
+         ▼
+     FastAPI  ── MySQL (runs, findings, requirements, test cases)
+         │
+         ├─ Collector         → iTunes RSS API (deterministic)
+         ├─ Cleaner           → dedup, langdetect, sentiment (deterministic)
+         ├─ VectorStore       → ChromaDB + BGE-M3 embeddings
+         ├─ AnalysisService   → Qwen3-8B (topic extraction, finding gen)
+         ├─ EvidenceService   → vector search + embedding similarity
+         ├─ PRDService        → Qwen3-8B (requirements + version plan)
+         ├─ TestCaseService   → Qwen3-8B (test cases with traceability)
+         └─ ProgressService   → in-memory events + DB status
 ```
 
-The user should also be able to provide an analysis goal or constraint, such as focusing on subscription conversion, workout usability, a specific app version, or low-rating reviews. The system must not depend on app-specific hard-coded categories, findings, requirements, or test cases.
+**Pipeline stages (9 total):**
 
-After the user clicks "Start", the system should automatically complete the following workflow and display the results in the UI:
+| Stage | Name | Description |
+|-------|------|-------------|
+| 1 | Collection | Fetch reviews from App Store RSS or use imported data |
+| 2 | Cleaning | Dedup, language detection, sentiment scoring |
+| 3 | Vector Index | Build BGE-M3 embeddings in ChromaDB |
+| 4 | Topic Extraction | LLM-based semantic clustering (no predefined categories) |
+| 5 | Finding Generation | LLM extracts core issues from topics + reviews |
+| 6 | Evidence Validation | Vector search validates findings, marks assumptions/conflicts |
+| 7 | PRD Generation | LLM converts validated findings into requirements + versions |
+| 8 | Test Case Generation | LLM generates test cases linked to requirements |
+| 9 | Done | Mark run as completed |
 
-1. Determine the analysis scope based on the user's goal and the available data.
-2. Collect review data for the app.
-3. Clean, deduplicate, and structure the review data.
-4. Dynamically classify and analyze the reviews, rather than relying only on fixed keyword mappings or a predefined issue taxonomy.
-5. Evaluate whether the available evidence is sufficient, and identify conflicting feedback, uncertainty, and data limitations.
-6. Create an update plan based on the analysis, produce a PRD, and split the scope into multiple versions when necessary.
-7. Generate test cases based on the PRD, with each test case linked to its requirement and source user reviews.
-8. Validate the traceability chain from reviews to findings, requirements, and test cases. Unsupported conclusions must be removed, revised, or explicitly marked as assumptions.
-9. Display the execution progress in the UI, including the stages, intermediate results, validation results, errors, and revisions.
-10. Display the interim and final deliverables, including raw reviews, cleaned data, classification results, findings, PRD drafts, and test case drafts.
+> **Note**: This project uses a **linear pipeline**, not LangGraph or multi-agent
+> orchestration. Each stage runs sequentially in a background thread, with
+> non-fatal stages (PRD, test cases) able to fail without aborting the whole run.
 
-## AI Requirements
+For the full design including pipeline details and traceability rules, see
+[Project Documents/产品文档.md](file:///d:/AI/agent_vc/AppStore_vc/AppStore_vc/Project%20Documents/产品文档.md).
 
-- At least one core semantic task must be model-driven. Suitable tasks include dynamic topic discovery, issue consolidation, evidence-grounded analysis, requirement generation, or test case generation. Implementing all semantic analysis only through fixed keywords, regular expressions, lookup tables, or manually predefined mappings does not meet this requirement.
-- Deterministic rules are encouraged where they are appropriate, including data collection, deduplication, field normalization, validation, and safety checks. The submission should explain why rules, statistical methods, or language models were chosen for each stage.
-- Every major finding must include its source review IDs or excerpts, supporting sample count, confidence or uncertainty, and any material conflicting evidence. Model-generated conclusions must remain distinguishable from deterministic statistics.
-- The submission must document the model and provider used, the main prompts or tool definitions, model configuration, failure-handling strategy, and measures used to reduce hallucinations and unsupported conclusions.
-- Hosted APIs, local models, or other model runtimes may be used. Secrets must be supplied through environment configuration and must not be committed to the repository.
+## 🚀 Quick Start
 
-## Deliverables
+### Prerequisites
+- Python 3.10+
+- Node.js 18+ (Node 20+ recommended)
+- MySQL 8.0+
+- Anaconda (for Python environment management)
 
-Submit a GitHub project link and ensure the project can run locally.
+### Backend
 
-The GitHub project should include complete source code, dependency configuration, running instructions, an explanation of the data collection method, and any necessary sample output or cached data so that interviewers can review the results even when external network access is unavailable. Cached results must be clearly labeled and must not replace the ability to process a previously unseen input when the required network and model configuration are available.
+```powershell
+cd AppStore_vc/backend
 
-The application must also support importing review data from a documented JSON or CSV format. During evaluation, interviewers may provide a different valid App Store link, a previously unseen compatible review dataset, or a new analysis goal. The submission will be evaluated on whether it can produce grounded results without app-specific hard coding.
+# Create environment
+conda create -n appstore_vc python=3.10 -y
+conda activate appstore_vc
 
-The GitHub project should preserve a complete commit history to show the candidate's implementation process, iteration process, and use of vibe coding.
+# Install dependencies
+pip install -r requirements.txt
 
-## Technical Requirements and Notes
+# Configure
+Copy-Item .env.example .env
+# Edit .env: set DB_PASSWORD and SILICONFLOW_API_KEY
 
-- There is no restriction on the tech stack.
-- You may use frontend frameworks, backend frameworks, data analysis libraries, visualization libraries, natural language processing models, or large language model APIs.
-- You may use public APIs or third-party data collection libraries, but you must clearly explain the data source and its limitations.
-- Pay attention to request rate limits and avoid placing abnormal load on the target site.
-- Provide a sample environment file or equivalent configuration instructions, but do not include API keys or other secrets.
-- A non-runnable document-only submission is not acceptable.
+# Create database
+mysql -u root -p -e "CREATE DATABASE appstore_vc CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
-## Evaluation Criteria
+# Initialize tables
+python -m app.create_tables
 
-This assessment focuses on whether the candidate can turn real user reviews into an executable product plan. The evaluation will mainly consider:
+# Run
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
 
-- Whether the data is authentic and reproducible, with a clear explanation of its source and limitations.
-- Whether review cleaning, classification, and analysis are reasonable, and whether they surface concrete user problems.
-- Whether model-driven semantic analysis adds capability beyond fixed rules and generalizes to previously unseen reviews, apps, and analysis goals.
-- Whether findings distinguish evidence, deterministic statistics, model-generated conclusions, uncertainty, and conflicting feedback.
-- Whether the PRD is grounded in user problems, with clear requirement boundaries, priorities, and version planning.
-- Whether the test cases cover the PRD and can be traced back to the corresponding user reviews.
-- Whether the UI clearly presents the workflow and results, and whether the project can run locally with clear delivery instructions.
+### Frontend
 
-## Important Notes
+```powershell
+cd AppStore_vc/frontend
+npm install
+npm run dev
+```
 
-- This is not merely a web scraping task, nor is it merely a UI presentation task.
-- The core challenge is to identify problems from real user reviews and turn them into executable product requirements and test plans.
-- Review data should not be collected by scraping only the visible content of the page. There are more appropriate ways to retrieve App Store review data; candidates are expected to explore them independently and explain their implementation.
-- Requirements in the PRD must be traceable to specific user reviews.
-- Test cases must be able to verify whether the corresponding requirements solve the problems raised in those reviews.
-- The use of an AI coding assistant during implementation does not by itself satisfy the AI requirements. The submitted application must demonstrate model-driven semantic analysis at runtime.
-- Interviewers may test the application with previously unseen data, mixed languages, duplicate or conflicting reviews, insufficient evidence, or temporary collection/model failures.
-- If the amount of available data is limited or data collection is constrained, state this transparently in the results. Do not fabricate data.
+Open http://localhost:5173
+
+## 📖 How to Use
+
+### Option A: Analyze an App Store app
+1. Open http://localhost:5173/analyze
+2. Paste an App Store URL (e.g. `https://apps.apple.com/us/app/workout-for-women-home-gym/id839285684`)
+3. Optionally provide an analysis goal (e.g. "subscription and usability issues")
+4. Click "开始分析" — watch live progress through all 9 pipeline stages
+5. Browse results in the tabs: Reviews / Findings / PRD / Test Cases
+
+### Option B: Import external review data (JSON / CSV)
+1. Open http://localhost:5173/import
+2. Upload a `.json` or `.csv` file (download sample templates from the page)
+3. Click "导入数据"
+4. Optionally start analysis on the imported data
+
+**CSV format:**
+```csv
+app_id,app_name,author,rating,title,content,review_date,app_version
+```
+
+**JSON format:** Array of objects with the same fields.
+
+> Re-importing the same file is safe — duplicates are automatically skipped,
+> and the correct `app_id` is returned so analysis can proceed on existing data.
+
+### Option C: View cached sample results (no network required)
+Open [sample_data/sample_analysis_result.json](file:///d:/AI/agent_vc/AppStore_vc/AppStore_vc/sample_data/sample_analysis_result.json)
+to inspect a representative full-pipeline output.
+
+## 📚 Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [Project Documents/项目材料记录.md](file:///d:/AI/agent_vc/AppStore_vc/AppStore_vc/Project%20Documents/项目材料记录.md) | Models, prompts, model config, failure handling, anti-hallucination measures (required by assessment) |
+| [Project Documents/产品文档.md](file:///d:/AI/agent_vc/AppStore_vc/AppStore_vc/Project%20Documents/产品文档.md) | Product architecture, business flow, pipeline design, traceability rules |
+| [Project Documents/项目启动及配置说明.md](file:///d:/AI/agent_vc/AppStore_vc/AppStore_vc/Project%20Documents/项目启动及配置说明.md) | Detailed setup, run instructions, common issues, maintenance scripts |
+| [sample_data/README.md](file:///d:/AI/agent_vc/AppStore_vc/AppStore_vc/sample_data/README.md) | Sample data usage |
+
+## 🗂️ Data Source & Limitations
+
+- **Source**: Apple iTunes RSS Customer Reviews API
+  - URL: `https://itunes.apple.com/us/rss/customerreviews/id={app_id}/page={page}/sortBy=mostRecent/json`
+- **Limitations**:
+  - Max 50 reviews/page × 10 pages = ~500 reviews per app
+  - Only publicly visible reviews; deleted or hidden reviews are not included
+  - Developer responses are not returned by the RSS feed
+  - Some historical reviews may be unavailable
+- **Rate limiting**: 1-second delay between requests (`REQUEST_DELAY`) to avoid abnormal load on Apple's servers
+- **Real data only**: no simulated or synthetic reviews are stored in the database
+
+## 🔌 API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/analyze` | Start async analysis pipeline (returns run_id immediately) |
+| GET | `/api/analyze/{run_id}/progress` | Poll progress events |
+| GET | `/api/analyze/{run_id}/stream` | SSE stream of progress events |
+| POST | `/api/import` | Import reviews from JSON/CSV file |
+| POST | `/api/import/analyze` | Analyze previously imported reviews |
+| GET | `/api/runs` | List all analysis runs |
+| GET | `/api/runs/{id}` | Get full run details (topics, findings, requirements, test cases) |
+| GET | `/api/runs/{id}/reviews` | Get reviews for a run |
+| GET | `/api/runs/{id}/findings` | Get findings for a run |
+| GET | `/api/runs/{id}/requirements` | Get PRD requirements for a run |
+| GET | `/api/runs/{id}/testcases` | Get test cases for a run |
+| GET | `/api/runs/{id}/traceability` | Get full traceability chain |
+| GET | `/api/evidence/search` | Semantic search over review evidence |
+| POST | `/api/evidence/validate` | Validate a finding against evidence |
+
+Interactive docs at http://localhost:8000/docs
+
+## 🔐 Environment Variables
+
+See [backend/.env.example](file:///d:/AI/agent_vc/AppStore_vc/AppStore_vc/backend/.env.example). Required:
+
+- `DB_PASSWORD` — MySQL password
+- `SILICONFLOW_API_KEY` — API key from https://siliconflow.cn
+
+Optional (with defaults):
+
+- `LLM_PROVIDER` (default: `siliconflow`)
+- `SILICONFLOW_LLM_MODEL` (default: `Qwen/Qwen2.5-7B-Instruct`; project uses `Qwen/Qwen3-8B`)
+- `SILICONFLOW_BASE_URL` (default: `https://api.siliconflow.cn/v1`)
+- `EMBEDDING_MODEL` (default: `BAAI/bge-m3`)
+- `APP_STORE_COUNTRY` (default: `us`)
+- `MAX_REVIEWS_PER_FETCH` (default: `200`)
+- `REQUEST_DELAY` (default: `1.0`)
+- `CHROMADB_PATH` (default: `./chromadb`)
+- `NEO4J_URI` / `NEO4J_USER` / `NEO4J_PASSWORD` (optional; graph features disabled if unreachable)
+
+Secrets are loaded from `.env` and never committed to the repository.
+
+## 🛠️ Maintenance Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `python -m app.create_tables` | Create all database tables |
+| `python -m app.migrate_schema` | Apply incremental schema migrations (add new columns) |
+| `python -m app.cleanup_zombies` | Detect and optionally clean up zombie runs (stuck in "running" status) |
+
+```powershell
+# Dry-run: list zombie runs without deleting
+python -m app.cleanup_zombies
+
+# Apply: mark zombie runs as failed
+python -m app.cleanup_zombies --apply
+```
+
+## 🧱 Tech Stack
+
+**Backend**: Python 3.10, FastAPI, SQLAlchemy, MySQL 8.0, ChromaDB, Pydantic
+**LLM**: Qwen3-8B (SiliconFlow API), BGE-M3 embeddings (SiliconFlow API)
+**Frontend**: React 18, TypeScript, Vite, TailwindCSS, Zustand, React Router, lucide-react
+**Optional**: Neo4j Community (graph features; automatically disabled if credentials are invalid or server is unreachable)
+
+## 📝 License
+
+This project is for the LaienTech evaluation.

@@ -35,39 +35,42 @@ export const Traceability = () => {
       setIsLoading(true);
       const [reviews, findings, requirements, testCases] = await Promise.all([
         apiClient.getReviewsByRunId(runId),
-        fetch(`http://localhost:8000/api/runs/${runId}/findings`).then((r) => r.ok ? r.json() : []),
-        fetch(`http://localhost:8000/api/runs/${runId}/requirements`).then((r) => r.ok ? r.json() : []),
-        fetch(`http://localhost:8000/api/runs/${runId}/testcases`).then((r) => r.ok ? r.json() : []),
+        apiClient.getFindingsByRunId(runId).catch(() => []),
+        apiClient.getRequirementsByRunId(runId).catch(() => []),
+        apiClient.getTestCasesByRunId(runId).catch(() => []),
       ]);
 
-      const nodes = reviews.slice(0, 10).map((review: Review) => ({
+      const nodes: TraceNode[] = reviews.slice(0, 10).map((review: Review) => ({
         type: "review" as const,
         id: review.id,
-        title: review.title,
-        content: review.body.substring(0, 100) + "...",
+        title: review.title || `评论 #${review.id}`,
+        content: (review.content || "").substring(0, 100) + "...",
         children: findings
+          .filter((finding: Finding) =>
+            (finding.evidence_review_ids || []).includes(review.id)
+          )
           .slice(0, 3)
           .map((finding: Finding) => ({
             type: "finding" as const,
             id: finding.id,
             title: `发现 ${finding.id}`,
-            content: finding.description.substring(0, 80) + "...",
+            content: (finding.finding_text || "").substring(0, 80) + "...",
             children: requirements
               .filter((req: Requirement) => req.finding_id === finding.id)
               .slice(0, 2)
               .map((req: Requirement) => ({
                 type: "requirement" as const,
                 id: req.id,
-                title: req.title,
-                content: req.description.substring(0, 80) + "...",
+                title: req.requirement_text,
+                content: (req.description || req.requirement_text || "").substring(0, 80) + "...",
                 children: testCases
                   .filter((tc: TestCase) => tc.requirement_id === req.id)
                   .slice(0, 2)
                   .map((tc: TestCase) => ({
                     type: "testcase" as const,
                     id: tc.id,
-                    title: tc.title,
-                    content: tc.description.substring(0, 60) + "...",
+                    title: tc.case_title,
+                    content: (tc.case_description || "").substring(0, 60) + "...",
                   })),
               })),
           })),

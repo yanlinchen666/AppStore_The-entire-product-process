@@ -1,9 +1,14 @@
-import logging
+﻿import logging
+from contextlib import asynccontextmanager
+from datetime import datetime
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 from app.routes.api import router
 from app.config import settings
+from app.database import SessionLocal
+from app.models import AnalysisRun
 
 logging.basicConfig(
     level=logging.INFO,
@@ -12,10 +17,44 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Startup recovery: any AnalysisRun left in 'running' status is a zombie —
+    the background pipeline thread died with the previous process, and the
+    in-memory progress events are gone. Mark them as 'failed' so the
+    frontend doesn't show them stuck at 0% forever.
+    """
+    db: Session = SessionLocal()
+    try:
+        zombies = db.query(AnalysisRun).filter(AnalysisRun.status == "running").all()
+        if zombies:
+            for z in zombies:
+                z.status = "failed"
+                z.error_message = "后端重启导致分析中断（pipeline 线程已销毁，进度事件已丢失）"
+                z.completed_at = datetime.now()
+                logger.warning(
+                    f"Recovered zombie run id={z.id} app='{z.app_name}' "
+                    f"started={z.started_at} -> marked as failed"
+                )
+            db.commit()
+            logger.info(f"Startup recovery: marked {len(zombies)} zombie run(s) as failed.")
+        else:
+            logger.info("Startup recovery: no zombie runs found.")
+    except Exception as e:
+        logger.error(f"Startup recovery failed: {e}", exc_info=True)
+    finally:
+        db.close()
+
+    yield  # app runs
+
+
 app = FastAPI(
     title="App Store Review Analysis API",
     description="API for analyzing iOS App Store reviews and generating product requirements",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

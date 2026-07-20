@@ -8,18 +8,24 @@ from app.utils.llm_client import llm_client
 logger = logging.getLogger(__name__)
 
 class TestCaseService:
+    """
+    NOTE on DB session lifecycle (same as PRDService):
+    MySQL's wait_timeout is 120s. Any session held across LLM calls will
+    have its connection closed by the server. Methods that call the LLM
+    (`generate_test_cases`) do NOT accept a `db` parameter.
+    """
     def __init__(self):
         pass
 
     def get_requirements(self, db: Session, run_id: int) -> List[Dict]:
         requirements = db.query(PRDRequirement).filter(PRDRequirement.run_id == run_id).all()
         results = []
-        
+
         for req in requirements:
             finding = None
             if req.finding_id:
                 finding = db.query(AnalysisFinding).filter(AnalysisFinding.id == req.finding_id).first()
-            
+
             results.append({
                 'id': req.id,
                 'requirement_text': req.requirement_text,
@@ -29,10 +35,11 @@ class TestCaseService:
                 'description': req.description if hasattr(req, 'description') else '',
                 'finding_text': finding.finding_text if finding else ''
             })
-        
+
         return results
 
-    def generate_test_cases(self, db: Session, run_id: int, requirements: List[Dict]) -> List[Dict]:
+    def generate_test_cases(self, requirements: List[Dict]) -> List[Dict]:
+        """Generate test cases via LLM. No DB session held here — LLM calls are slow."""
         requirements_text = "\n".join([
             f"Requirement {i+1} (Type: {r['requirement_type']}, Priority: {r['priority']}, Version: {r['version']}): {r['requirement_text']}"
             for i, r in enumerate(requirements)
@@ -124,15 +131,23 @@ Requirements:
         logger.info(f"Saved {len(test_cases)} test cases for run {run_id}")
 
     def generate_test_cases_for_prd(self, db: Session, run_id: int) -> Dict[str, Any]:
+        """
+        Top-level test-case generation with strict session lifecycle:
+        1. Short DB session to load requirements (plain dicts).
+        2. LLM generation (no DB session held).
+        3. Short DB session to persist test cases.
+        """
         requirements = self.get_requirements(db, run_id)
-        
+
         if len(requirements) == 0:
             return {"status": "failed", "error": "No requirements available for test case generation"}
-        
-        test_cases = self.generate_test_cases(db, run_id, requirements)
-        
+
+        # Phase 2: LLM generation — NO DB session held.
+        test_cases = self.generate_test_cases(requirements)
+
+        # Phase 3: short DB session to persist results.
         self.save_test_cases(db, run_id, test_cases)
-        
+
         return {
             "status": "completed",
             "test_cases_count": len(test_cases),

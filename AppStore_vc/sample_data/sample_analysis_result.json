@@ -1,0 +1,384 @@
+{
+  "_meta": {
+    "description": "Cached sample analysis output. Generated from sample_reviews.json using the full pipeline (Qwen3-8B + BGE-M3 + ChromaDB).",
+    "is_cached_sample": true,
+    "generated_at": "2025-01-15T12:00:00Z",
+    "models": {
+      "llm": "Qwen/Qwen3-8B via SiliconFlow",
+      "embedding": "BAAI/bge-m3 via SiliconFlow"
+    }
+  },
+  "run": {
+    "id": 1,
+    "app_id": "839285684",
+    "app_name": "Workout for Women: Home Gym",
+    "analysis_goal": "Analyze subscription and usability issues",
+    "status": "completed",
+    "total_reviews": 10,
+    "cleaned_reviews": 10,
+    "started_at": "2025-01-15T11:50:00",
+    "completed_at": "2025-01-15T11:55:00",
+    "error_message": null
+  },
+  "topics": [
+    {
+      "id": 1,
+      "name": "Subscription & Billing Issues",
+      "description": "Complaints about unexpected charges, hidden fees, and difficulty canceling subscriptions.",
+      "confidence": 0.95,
+      "sample_count": 5,
+      "is_model_generated": true
+    },
+    {
+      "id": 2,
+      "name": "App Stability & Crashes",
+      "description": "Reports of crashes on launch, during workouts, and after updates on iOS 17.",
+      "confidence": 0.90,
+      "sample_count": 3,
+      "is_model_generated": true
+    },
+    {
+      "id": 3,
+      "name": "Workout Content Quality",
+      "description": "Positive feedback on workout variety, trainer quality, and results.",
+      "confidence": 0.85,
+      "sample_count": 4,
+      "is_model_generated": true
+    },
+    {
+      "id": 4,
+      "name": "Feature Requests",
+      "description": "Requests for postpartum workouts, Apple Watch heart rate tracking, and clearer content categorization.",
+      "confidence": 0.70,
+      "sample_count": 2,
+      "is_model_generated": true
+    }
+  ],
+  "findings": [
+    {
+      "id": 1,
+      "topic_id": 1,
+      "finding_text": "Users report being charged immediately upon signing up for the free trial without clear disclosure of auto-conversion to a paid subscription.",
+      "finding_type": "problem",
+      "impact": "high",
+      "evidence_review_ids": [1, 2],
+      "sample_count": 2,
+      "supporting_count": 2,
+      "confidence": 0.95,
+      "has_conflict": false,
+      "conflicting_review_ids": [],
+      "conflicting_count": 0,
+      "is_assumption": false,
+      "validation_status": "validated",
+      "is_model_generated": true
+    },
+    {
+      "id": 2,
+      "topic_id": 1,
+      "finding_text": "The subscription cancellation flow is broken - the cancel button redirects to a non-functional page, forcing users to contact Apple Support.",
+      "finding_type": "problem",
+      "impact": "high",
+      "evidence_review_ids": [7],
+      "sample_count": 1,
+      "supporting_count": 1,
+      "confidence": 0.60,
+      "has_conflict": false,
+      "conflicting_review_ids": [],
+      "conflicting_count": 0,
+      "is_assumption": true,
+      "validation_status": "assumption",
+      "is_model_generated": true
+    },
+    {
+      "id": 3,
+      "topic_id": 1,
+      "finding_text": "Additional workout packs are sold as in-app purchases without clear indication of which content is included in the base subscription, leading to perceived hidden fees.",
+      "finding_type": "problem",
+      "impact": "high",
+      "evidence_review_ids": [10],
+      "sample_count": 1,
+      "supporting_count": 1,
+      "confidence": 0.55,
+      "has_conflict": false,
+      "conflicting_review_ids": [],
+      "conflicting_count": 0,
+      "is_assumption": true,
+      "validation_status": "assumption",
+      "is_model_generated": true
+    },
+    {
+      "id": 4,
+      "topic_id": 2,
+      "finding_text": "App crashes consistently on iOS 17.2, particularly when starting a workout after the countdown timer, affecting iPhone 14 users.",
+      "finding_type": "problem",
+      "impact": "high",
+      "evidence_review_ids": [4, 5],
+      "sample_count": 2,
+      "supporting_count": 2,
+      "confidence": 0.90,
+      "has_conflict": false,
+      "conflicting_review_ids": [],
+      "conflicting_count": 0,
+      "is_assumption": false,
+      "validation_status": "validated",
+      "is_model_generated": true
+    },
+    {
+      "id": 5,
+      "topic_id": 3,
+      "finding_text": "Users praise the variety and quality of workout routines, with reports of measurable results within 4-6 weeks.",
+      "finding_type": "positive_feedback",
+      "impact": "medium",
+      "evidence_review_ids": [3, 6, 9],
+      "sample_count": 3,
+      "supporting_count": 3,
+      "confidence": 0.90,
+      "has_conflict": false,
+      "conflicting_review_ids": [],
+      "conflicting_count": 0,
+      "is_assumption": false,
+      "validation_status": "validated",
+      "is_model_generated": true
+    },
+    {
+      "id": 6,
+      "topic_id": 4,
+      "finding_text": "Users request postpartum-specific workouts and Apple Watch heart rate integration.",
+      "finding_type": "feature_request",
+      "impact": "medium",
+      "evidence_review_ids": [9],
+      "sample_count": 1,
+      "supporting_count": 1,
+      "confidence": 0.50,
+      "has_conflict": false,
+      "conflicting_review_ids": [],
+      "conflicting_count": 0,
+      "is_assumption": true,
+      "validation_status": "assumption",
+      "is_model_generated": true
+    }
+  ],
+  "requirements": [
+    {
+      "id": 1,
+      "finding_id": 1,
+      "requirement_text": "Display explicit consent dialog before any subscription charge, clearly disclosing auto-conversion terms.",
+      "description": "Add a pre-purchase consent dialog that shows the subscription price, billing cycle, and auto-renewal terms before the user confirms. The dialog must be acknowledged (not just dismissed) before Apple's In-App Purchase flow is triggered.",
+      "user_value": "Eliminates surprise charges and builds trust.",
+      "business_value": "Reduces refund requests and 1-star reviews.",
+      "requirement_type": "improvement",
+      "priority": "high",
+      "version": "v1.0",
+      "estimated_effort": "medium",
+      "source_review_ids": [1, 2],
+      "is_model_generated": true
+    },
+    {
+      "id": 2,
+      "finding_id": 4,
+      "requirement_text": "Fix iOS 17.2 crash that occurs when starting a workout after the countdown timer.",
+      "description": "Investigate and fix the crash triggered after the workout countdown timer on iOS 17.2 (iPhone 14). Likely related to AVPlayer or SceneDelegate lifecycle changes in iOS 17.",
+      "user_value": "Allows paid users to actually use the app.",
+      "business_value": "Prevents subscription cancellations due to unusable app.",
+      "requirement_type": "bug_fix",
+      "priority": "high",
+      "version": "v1.0",
+      "estimated_effort": "high",
+      "source_review_ids": [4, 5],
+      "is_model_generated": true
+    },
+    {
+      "id": 3,
+      "finding_id": 2,
+      "requirement_text": "Repair the in-app subscription cancellation flow so users can cancel without contacting Apple Support.",
+      "description": "The cancel button currently redirects to a broken page. Fix the redirect to point to Apple's manage-subscription URL or implement an in-app cancellation flow.",
+      "user_value": "Allows users to cancel subscriptions easily.",
+      "business_value": "Compliance with App Store Review Guideline 3.1.2.",
+      "requirement_type": "bug_fix",
+      "priority": "high",
+      "version": "v1.0",
+      "estimated_effort": "low",
+      "source_review_ids": [7],
+      "is_model_generated": true
+    },
+    {
+      "id": 4,
+      "finding_id": 3,
+      "requirement_text": "Add clear badges distinguishing included vs. premium (in-app purchase) workout packs.",
+      "description": "Display a 'Premium' or 'Included' badge on each workout pack so users know what they get with their subscription vs. what requires additional purchase.",
+      "user_value": "Transparent content categorization.",
+      "business_value": "Reduces perceived hidden-fee complaints.",
+      "requirement_type": "ui/ux",
+      "priority": "medium",
+      "version": "v1.1",
+      "estimated_effort": "medium",
+      "source_review_ids": [10],
+      "is_model_generated": true
+    },
+    {
+      "id": 5,
+      "finding_id": 6,
+      "requirement_text": "Add postpartum-specific workout category and Apple Watch heart rate integration.",
+      "description": "Curate a postpartum workout category with low-impact, recovery-focused routines. Integrate HealthKit to display heart rate during workouts on Apple Watch.",
+      "user_value": "Serves underserved user segment (postpartum women).",
+      "business_value": "Expands addressable market and increases retention.",
+      "requirement_type": "feature",
+      "priority": "medium",
+      "version": "v2.0",
+      "estimated_effort": "high",
+      "source_review_ids": [9],
+      "is_model_generated": true
+    }
+  ],
+  "versions": [
+    {
+      "version_name": "v1.0",
+      "description": "Critical fixes for billing and crashes - 3 requirements",
+      "priority": 1,
+      "estimated_effort": "high",
+      "requirements_count": 3
+    },
+    {
+      "version_name": "v1.1",
+      "description": "UX improvements for content transparency - 1 requirement",
+      "priority": 2,
+      "estimated_effort": "medium",
+      "requirements_count": 1
+    },
+    {
+      "version_name": "v2.0",
+      "description": "New features for underserved segments - 1 requirement",
+      "priority": 3,
+      "estimated_effort": "high",
+      "requirements_count": 1
+    }
+  ],
+  "test_cases": [
+    {
+      "id": 1,
+      "requirement_id": 1,
+      "case_title": "Verify explicit consent dialog appears before subscription purchase",
+      "case_description": "Ensure a consent dialog displaying price, billing cycle, and auto-renewal terms is shown before triggering the Apple In-App Purchase flow.",
+      "test_steps": [
+        "Launch the app with a fresh install",
+        "Navigate to the subscription purchase screen",
+        "Tap 'Start Free Trial'",
+        "Verify the consent dialog appears with price, billing cycle, and auto-renewal terms",
+        "Verify the purchase flow does not proceed until the user explicitly taps 'Agree & Continue'"
+      ],
+      "expected_result": "The consent dialog appears, displays all required disclosure information, and blocks the purchase flow until explicitly acknowledged.",
+      "test_type": "functional",
+      "priority": "high",
+      "is_model_generated": true
+    },
+    {
+      "id": 2,
+      "requirement_id": 1,
+      "case_title": "Verify no charge occurs during free trial without explicit consent",
+      "case_description": "Confirm the user is not charged until the trial ends and only if they have explicitly consented.",
+      "test_steps": [
+        "Sign up for the free trial",
+        "Decline the consent dialog",
+        "Verify the purchase flow is aborted",
+        "Check that no charge appears in the sandbox account"
+      ],
+      "expected_result": "No charge occurs if the user declines the consent dialog.",
+      "test_type": "functional",
+      "priority": "high",
+      "is_model_generated": true
+    },
+    {
+      "id": 3,
+      "requirement_id": 2,
+      "case_title": "Verify no crash on iOS 17.2 when starting a workout",
+      "case_description": "Ensure the app does not crash when the user starts a workout after the countdown timer on iOS 17.2.",
+      "test_steps": [
+        "Install the app on iPhone 14 running iOS 17.2",
+        "Launch the app and sign in with a subscribed account",
+        "Select any workout from the library",
+        "Tap 'Start Workout'",
+        "Wait for the countdown timer to complete",
+        "Verify the workout video plays without crashing"
+      ],
+      "expected_result": "The workout video plays successfully after the countdown timer without any crash.",
+      "test_type": "regression",
+      "priority": "high",
+      "is_model_generated": true
+    },
+    {
+      "id": 4,
+      "requirement_id": 3,
+      "case_title": "Verify subscription cancellation button redirects to Apple's manage-subscription page",
+      "case_description": "Ensure the cancel subscription button redirects the user to a working Apple manage-subscription URL.",
+      "test_steps": [
+        "Sign in with a subscribed account",
+        "Navigate to Settings > Subscription",
+        "Tap 'Cancel Subscription'",
+        "Verify the user is redirected to Apple's manage-subscription page (itms-apps://apps.apple.com/account/subscriptions)",
+        "Verify the page loads successfully"
+      ],
+      "expected_result": "The user is successfully redirected to Apple's manage-subscription page and can cancel the subscription.",
+      "test_type": "functional",
+      "priority": "high",
+      "is_model_generated": true
+    },
+    {
+      "id": 5,
+      "requirement_id": 4,
+      "case_title": "Verify 'Included' and 'Premium' badges display correctly on workout packs",
+      "case_description": "Ensure workout packs that are part of the base subscription show an 'Included' badge, and packs requiring an additional purchase show a 'Premium' badge.",
+      "test_steps": [
+        "Sign in with a subscribed account",
+        "Browse the workout library",
+        "Verify each workout pack displays either an 'Included' or 'Premium' badge",
+        "Tap a 'Premium' pack and verify it prompts for an additional purchase",
+        "Tap an 'Included' pack and verify it starts immediately"
+      ],
+      "expected_result": "All workout packs display the correct badge and behave consistently with their badge.",
+      "test_type": "ui",
+      "priority": "medium",
+      "is_model_generated": true
+    },
+    {
+      "id": 6,
+      "requirement_id": 5,
+      "case_title": "Verify postpartum workout category appears and contains curated content",
+      "case_description": "Ensure a postpartum-specific workout category exists and contains low-impact recovery routines.",
+      "test_steps": [
+        "Sign in with a subscribed account",
+        "Navigate to the workout categories",
+        "Verify a 'Postpartum' category exists",
+        "Tap the category and verify it contains at least 5 curated workouts",
+        "Open a workout and verify it is low-impact and recovery-focused"
+      ],
+      "expected_result": "Postpartum category exists with at least 5 low-impact recovery workouts.",
+      "test_type": "functional",
+      "priority": "medium",
+      "is_model_generated": true
+    }
+  ],
+  "traceability_summary": {
+    "total_reviews": 10,
+    "total_findings": 6,
+    "total_requirements": 5,
+    "total_test_cases": 6,
+    "assumption_count": 4,
+    "conflict_count": 0,
+    "chain_examples": [
+      {
+        "review_id": 1,
+        "finding_id": 1,
+        "requirement_id": 1,
+        "test_case_id": 1,
+        "description": "Review #1 (subscription scam) → Finding #1 (unexpected charge) → Requirement #1 (consent dialog) → Test Case #1 (verify dialog)"
+      },
+      {
+        "review_id": 4,
+        "finding_id": 4,
+        "requirement_id": 2,
+        "test_case_id": 3,
+        "description": "Review #4 (crashes on iOS 17) → Finding #4 (crash after countdown) → Requirement #2 (fix crash) → Test Case #3 (verify no crash)"
+      }
+    ]
+  }
+}

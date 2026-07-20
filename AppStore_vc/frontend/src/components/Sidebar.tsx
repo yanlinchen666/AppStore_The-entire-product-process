@@ -1,4 +1,4 @@
-import { LayoutDashboard, Search, BarChart3, GitBranch, Menu, X } from "lucide-react";
+import { LayoutDashboard, Search, BarChart3, GitBranch, Upload, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -14,6 +14,7 @@ export const Sidebar = ({ collapsed = false }: SidebarProps) => {
   const navItems = [
     { icon: LayoutDashboard, label: "仪表盘", path: "/" },
     { icon: Search, label: "创建分析", path: "/analyze" },
+    { icon: Upload, label: "导入数据", path: "/import" },
     { icon: BarChart3, label: "分析列表", path: "/runs" },
     { icon: GitBranch, label: "追溯链", path: "/traceability" },
   ];

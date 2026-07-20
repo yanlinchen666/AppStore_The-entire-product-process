@@ -135,21 +135,28 @@ Requirements:
         
         return topics
 
-    def generate_findings(self, db: Session, run_id: int, topics: List[Dict], reviews: List[Dict]) -> List[Dict]:
+    def generate_findings(self, run_id: int, topics: List[Dict], reviews: List[Dict]) -> List[Dict]:
+        """
+        NOTE: This method makes long-running LLM calls (one per topic).
+        It does NOT use the database, so no `db` session is accepted —
+        holding a session across LLM calls would let MySQL's wait_timeout
+        (120s) close the underlying connection.
+        """
         all_findings = []
-        
+
         for topic in topics:
             topic_reviews = []
+            keywords = topic.get('keywords', [])
             for review in reviews:
                 content = review['content'].lower()
-                if any(k.lower() in content for k in topic.get('keywords', [])):
+                if any(k.lower() in content for k in keywords) if keywords else True:
                     topic_reviews.append(review)
-            
+
             if len(topic_reviews) == 0:
                 continue
 
             review_samples = "\n".join([
-                f"Rating {r['rating']}/5: {r['content'][:100]}..."
+                f"Rating {r['rating']}/5 (ID: {r['review_id']}): {r['content'][:150]}"
                 for r in topic_reviews[:10]
             ])
 
@@ -165,30 +172,33 @@ Sample Reviews ({len(topic_reviews)} total):
 Please provide a JSON array of findings with the following structure:
 [
     {{
-        "finding": "Specific finding/observation",
+        "finding": "Specific finding/observation grounded in the reviews",
         "evidence_count": estimated_number_of_reviews_supporting_this,
         "confidence": 0.0-1.0,
         "has_conflict": false,
         "impact": "high" | "medium" | "low",
-        "type": "problem" | "feature_request" | "positive_feedback" | "question"
+        "type": "problem" | "feature_request" | "positive_feedback" | "question",
+        "source_review_ids": [list of review IDs that support this finding]
     }}
 ]
 
 Requirements:
 1. Generate 2-5 findings per topic
-2. Each finding must be grounded in the review evidence
+2. Each finding MUST be grounded in the review evidence
 3. Distinguish between problems, feature requests, and positive feedback
 4. Include confidence based on evidence strength
 5. Mention if there's conflicting feedback
+6. Include source_review_ids from the sample reviews provided
 """
 
             try:
                 response = llm_client.chat_completion([{"role": "user", "content": prompt}])
                 findings = self._parse_findings_response(response)
-                
+
                 for finding in findings:
                     finding['topic_name'] = topic['name']
                     finding['topic_id'] = None
+                    finding['topic_keywords'] = keywords
                     all_findings.append(finding)
             except Exception as e:
                 logger.error(f"Finding generation failed for topic {topic['name']}: {str(e)}")
@@ -200,7 +210,9 @@ Requirements:
                     "impact": topic.get('severity', 'medium'),
                     "type": "problem",
                     "topic_name": topic['name'],
-                    "topic_id": None
+                    "topic_id": None,
+                    "topic_keywords": keywords,
+                    "source_review_ids": [r['review_id'] for r in topic_reviews[:5]]
                 })
 
         return all_findings
@@ -216,31 +228,50 @@ Requirements:
             pass
         return []
 
-    def validate_findings(self, db: Session, findings: List[Dict]) -> List[Dict]:
+    def validate_findings(self, findings: List[Dict]) -> List[Dict]:
+        """
+        NOTE: This method calls evidence_service (vector search + embedding API),
+        which can be slow. It does NOT use the SQL database directly — no `db`
+        session is accepted, to avoid MySQL wait_timeout issues during long calls.
+        """
         validated_findings = []
-        
+
         for finding in findings:
             finding_text = finding['finding']
             topic_name = finding.get('topic_name', '')
-            
+
             validation = evidence_service.validate_finding_with_evidence(finding_text, topic_name)
-            
+
+            # Mark as assumption if evidence is insufficient
+            # Per README: "Conclusions without basis must be deleted, corrected, or explicitly marked as assumptions"
+            support_count = validation['support_count']
+            confidence = validation['confidence']
+            is_assumption = validation['is_assumption']
+
+            # If no supporting evidence at all, downgrade confidence significantly
+            if support_count == 0:
+                is_assumption = True
+                validation['validation_status'] = 'assumption'
+                logger.warning(f"Finding marked as assumption (no evidence): {finding_text[:80]}")
+
             validated_findings.append({
                 **finding,
                 'supporting_evidence': validation['supporting_evidence'],
                 'conflicting_evidence': validation['conflicting_evidence'],
-                'support_count': validation['support_count'],
+                'support_count': support_count,
                 'conflict_count': validation['conflict_count'],
-                'final_confidence': validation['confidence'],
+                'final_confidence': confidence,
                 'has_conflict': validation['has_conflict'],
+                'is_assumption': is_assumption,
+                'validation_status': validation['validation_status'],
                 'finding_id': validation['finding_id']
             })
-        
+
         return validated_findings
 
     def save_topics_and_findings(self, db: Session, run_id: int, topics: List[Dict], findings: List[Dict]) -> None:
         topic_map = {}
-        
+
         for topic_data in topics:
             topic = AnalysisTopic(
                 run_id=run_id,
@@ -253,21 +284,33 @@ Requirements:
             db.add(topic)
             db.flush()
             topic_map[topic_data['name']] = topic.id
-        
+
         for finding_data in findings:
+            topic_name = finding_data.get('topic_name')
+            topic_id = topic_map.get(topic_name) if topic_name else None
+
+            # Use source_review_ids from LLM if available, else from evidence
+            source_review_ids = finding_data.get('source_review_ids', [])
+            evidence_review_ids = [e['review_id'] for e in finding_data.get('supporting_evidence', [])]
+            all_evidence_ids = list(set(source_review_ids + evidence_review_ids))
+
             finding = AnalysisFinding(
                 run_id=run_id,
-                topic_id=topic_map.get(finding_data.get('topic_name')),
+                topic_id=topic_id,
                 finding_text=finding_data['finding'],
-                evidence_review_ids=[e['review_id'] for e in finding_data.get('supporting_evidence', [])],
-                sample_count=finding_data.get('support_count', 0),
+                finding_type=finding_data.get('type', 'problem'),
+                impact=finding_data.get('impact', 'medium'),
+                evidence_review_ids=all_evidence_ids,
+                sample_count=finding_data.get('support_count', finding_data.get('evidence_count', 0)),
                 confidence=finding_data.get('final_confidence', finding_data.get('confidence', 0.0)),
                 has_conflict=finding_data.get('has_conflict', False),
                 conflicting_review_ids=[e['review_id'] for e in finding_data.get('conflicting_evidence', [])],
-                is_model_generated=True
+                is_model_generated=True,
+                is_assumption=finding_data.get('is_assumption', False),
+                validation_status=finding_data.get('validation_status', 'validated')
             )
             db.add(finding)
-        
+
         db.commit()
         logger.info(f"Saved {len(topics)} topics and {len(findings)} findings for run {run_id}")
 
@@ -297,10 +340,10 @@ Requirements:
             topics = self.extract_topics(reviews, analysis_goal)
             logger.info(f"Extracted {len(topics)} topics")
             
-            findings = self.generate_findings(db, run.id, topics, reviews)
+            findings = self.generate_findings(run.id, topics, reviews)
             logger.info(f"Generated {len(findings)} findings")
-            
-            validated_findings = self.validate_findings(db, findings)
+
+            validated_findings = self.validate_findings(findings)
             logger.info(f"Validated {len(validated_findings)} findings")
             
             self.save_topics_and_findings(db, run.id, topics, validated_findings)

@@ -43,14 +43,16 @@ class LLMClient:
     def _init_siliconflow(self):
         try:
             from openai import OpenAI
-            
+
             self.client = OpenAI(
                 api_key=settings.SILICONFLOW_API_KEY,
-                base_url=settings.SILICONFLOW_BASE_URL
+                base_url=settings.SILICONFLOW_BASE_URL,
+                timeout=120.0,       # 2 min timeout per request (prevents hangs)
+                max_retries=2,       # retry on transient errors
             )
             self.model_name = settings.SILICONFLOW_LLM_MODEL
             logger.info(f"Using SiliconFlow provider: {self.model_name}")
-            
+
         except Exception as e:
             logger.error(f"Failed to initialize SiliconFlow client: {str(e)}")
             raise

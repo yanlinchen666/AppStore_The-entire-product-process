@@ -6,11 +6,15 @@ import type {
   EvidenceSearchResult,
   EvidenceValidateRequest,
   EvidenceValidateResponse,
+  Finding,
+  Requirement,
   Review,
+  TestCase,
   TraceabilityChain,
+  ProgressResponse,
 } from "./types";
 
-const BASE_URL = "http://localhost:8000/api";
+const BASE_URL = "/api";
 
 export const apiClient = {
   getRuns: async (): Promise<AnalysisRun[]> => {
@@ -26,7 +30,8 @@ export const apiClient = {
     if (!response.ok) {
       throw new Error("Failed to fetch run");
     }
-    return response.json();
+    const data = await response.json();
+    return data.run;
   },
 
   getReviewsByRunId: async (id: number): Promise<Review[]> => {
@@ -37,7 +42,31 @@ export const apiClient = {
     return response.json();
   },
 
-  getTraceabilityChain: async (id: number): Promise<TraceabilityChain[]> => {
+  getFindingsByRunId: async (id: number): Promise<Finding[]> => {
+    const response = await fetch(`${BASE_URL}/runs/${id}/findings`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch findings");
+    }
+    return response.json();
+  },
+
+  getRequirementsByRunId: async (id: number): Promise<Requirement[]> => {
+    const response = await fetch(`${BASE_URL}/runs/${id}/requirements`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch requirements");
+    }
+    return response.json();
+  },
+
+  getTestCasesByRunId: async (id: number): Promise<TestCase[]> => {
+    const response = await fetch(`${BASE_URL}/runs/${id}/testcases`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch test cases");
+    }
+    return response.json();
+  },
+
+  getTraceabilityChain: async (id: number): Promise<TraceabilityChain> => {
     const response = await fetch(`${BASE_URL}/runs/${id}/traceability`);
     if (!response.ok) {
       throw new Error("Failed to fetch traceability chain");
@@ -48,18 +77,64 @@ export const apiClient = {
   analyze: async (data: AnalyzeRequest): Promise<AnalyzeResponse> => {
     const response = await fetch(`${BASE_URL}/analyze`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
     if (!response.ok) {
-      throw new Error("Failed to start analysis");
+      const error = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(error.detail || "Failed to start analysis");
     }
     return response.json();
   },
 
-  searchEvidence: async (data: EvidenceSearchRequest): Promise<EvidenceSearchResult[]> => {
+  getAnalysisProgress: async (runId: number): Promise<ProgressResponse> => {
+    const response = await fetch(`${BASE_URL}/analyze/${runId}/progress`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch progress");
+    }
+    return response.json();
+  },
+
+  importReviews: async (file: File, format: string, appId?: string): Promise<{
+    status: string;
+    reviews_imported: number;
+    app_id: string;
+    app_name: string;
+  }> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("format", format);
+    if (appId) {
+      formData.append("app_id", appId);
+    }
+    const response = await fetch(`${BASE_URL}/import`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(error.detail || "Failed to import reviews");
+    }
+    return response.json();
+  },
+
+  analyzeImported: async (appId: string, appName: string, analysisGoal: string): Promise<AnalyzeResponse> => {
+    const params = new URLSearchParams({
+      app_id: appId,
+      app_name: appName,
+      analysis_goal: analysisGoal,
+    });
+    const response = await fetch(`${BASE_URL}/import/analyze?${params}`, {
+      method: "POST",
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(error.detail || "Failed to start analysis on imported data");
+    }
+    return response.json();
+  },
+
+  searchEvidence: async (data: EvidenceSearchRequest): Promise<{ query: string; results: EvidenceSearchResult[] }> => {
     const params = new URLSearchParams({
       query: data.query,
       ...(data.top_k && { top_k: data.top_k.toString() }),
@@ -74,9 +149,7 @@ export const apiClient = {
   validateEvidence: async (data: EvidenceValidateRequest): Promise<EvidenceValidateResponse> => {
     const response = await fetch(`${BASE_URL}/evidence/validate`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
     if (!response.ok) {

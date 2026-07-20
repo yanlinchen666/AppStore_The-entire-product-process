@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, RefreshCw, MessageSquare, Lightbulb, FileCheck, GitBranch, Star, ThumbsUp, ThumbsDown } from "lucide-react";
+import { ArrowLeft, RefreshCw, MessageSquare, Lightbulb, FileCheck, GitBranch, Star, ThumbsUp, ThumbsDown, AlertTriangle } from "lucide-react";
 import { Loading } from "../components/Loading";
+import { ProgressTracker } from "../components/ProgressTracker";
 import { apiClient } from "../api/client";
 import type { AnalysisRun, Review, Finding, Requirement, TestCase } from "../api/types";
 
@@ -19,79 +20,75 @@ export const RunDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        const [runData, reviewsData] = await Promise.all([
-          apiClient.getRunById(Number(id)),
-          apiClient.getReviewsByRunId(Number(id)),
-        ]);
-        setRun(runData);
-        setReviews(reviewsData);
-      } catch (err) {
-        console.error("Failed to fetch data:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const loadRun = async () => {
+    if (!id) return;
+    try {
+      const runData = await apiClient.getRunById(Number(id));
+      setRun(runData);
+    } catch (err) {
+      console.error("Failed to fetch run:", err);
+    }
+  };
 
-    fetchData();
+  useEffect(() => {
+    const init = async () => {
+      setIsLoading(true);
+      await loadRun();
+      setIsLoading(false);
+    };
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Fetch reviews immediately (they may exist before analysis completes)
+  useEffect(() => {
+    if (!id || !run) return;
+    apiClient.getReviewsByRunId(Number(id))
+      .then(setReviews)
+      .catch((err) => console.error("Failed to fetch reviews:", err));
+  }, [id, run]);
+
+  // When run is completed, fetch findings/requirements/testcases
+  const loadResults = async () => {
+    if (!id) return;
+    try {
+      const [findingsData, requirementsData, testCasesData] = await Promise.all([
+        apiClient.getFindingsByRunId(Number(id)).catch(() => []),
+        apiClient.getRequirementsByRunId(Number(id)).catch(() => []),
+        apiClient.getTestCasesByRunId(Number(id)).catch(() => []),
+      ]);
+      setFindings(findingsData);
+      setRequirements(requirementsData);
+      setTestCases(testCasesData);
+    } catch (err) {
+      console.error("Failed to fetch results:", err);
+    }
+  };
 
   useEffect(() => {
     if (run?.status === "completed") {
-      fetchFindings();
-      fetchRequirements();
-      fetchTestCases();
+      loadResults();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run?.status, id]);
 
-  const fetchFindings = async () => {
-    try {
-      const response = await fetch(`http://localhost:8000/api/runs/${id}/findings`);
-      if (response.ok) {
-        setFindings(await response.json());
-      }
-    } catch (err) {
-      console.error("Failed to fetch findings:", err);
-    }
-  };
-
-  const fetchRequirements = async () => {
-    try {
-      const response = await fetch(`http://localhost:8000/api/runs/${id}/requirements`);
-      if (response.ok) {
-        setRequirements(await response.json());
-      }
-    } catch (err) {
-      console.error("Failed to fetch requirements:", err);
-    }
-  };
-
-  const fetchTestCases = async () => {
-    try {
-      const response = await fetch(`http://localhost:8000/api/runs/${id}/testcases`);
-      if (response.ok) {
-        setTestCases(await response.json());
-      }
-    } catch (err) {
-      console.error("Failed to fetch test cases:", err);
-    }
+  const handleProgressComplete = () => {
+    loadRun();
+    loadResults();
   };
 
   const filteredReviews = reviews.filter(
     (r) =>
-      r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.body.toLowerCase().includes(searchQuery.toLowerCase())
+      (r.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (r.content || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const tabs = [
     { key: "summary", label: "概览", icon: MessageSquare },
-    { key: "reviews", label: "评论", icon: Star },
-    { key: "findings", label: "发现", icon: Lightbulb },
-    { key: "prd", label: "PRD", icon: FileCheck },
-    { key: "testcases", label: "测试用例", icon: GitBranch },
+    { key: "reviews", label: `评论 (${reviews.length})`, icon: Star },
+    { key: "findings", label: `发现 (${findings.length})`, icon: Lightbulb },
+    { key: "prd", label: `PRD (${requirements.length})`, icon: FileCheck },
+    { key: "testcases", label: `测试用例 (${testCases.length})`, icon: GitBranch },
   ] as const;
 
   const getStatusColor = () => {
@@ -100,6 +97,8 @@ export const RunDetail = () => {
         return "bg-green-100 text-green-600";
       case "running":
         return "bg-primary-100 text-primary-600";
+      case "failed":
+        return "bg-red-100 text-red-600";
       default:
         return "bg-gray-100 text-gray-600";
     }
@@ -126,9 +125,15 @@ export const RunDetail = () => {
     );
   }
 
+  // Show progress tracker while running
+  const isRunning = run.status === "running";
+
   const avgRating = reviews.length > 0
     ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
     : 0;
+
+  const assumptionCount = findings.filter((f) => f.is_assumption).length;
+  const conflictCount = findings.filter((f) => f.has_conflict).length;
 
   return (
     <div className="min-h-screen p-8 animate-fade-in">
@@ -142,26 +147,47 @@ export const RunDetail = () => {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-800">{run.app_name}</h1>
-            <p className="text-gray-500 text-sm">分析目标：{run.analysis_goal}</p>
+            <p className="text-gray-500 text-sm">分析目标：{run.analysis_goal || "未指定"}</p>
           </div>
           <div className={`ml-auto px-3 py-1 rounded-full text-sm font-medium ${getStatusColor()}`}>
-            {run.status === "completed" ? "已完成" : run.status === "running" ? "分析中..." : "待处理"}
+            {run.status === "completed" ? "已完成" : run.status === "running" ? "分析中..." : run.status === "failed" ? "失败" : "待处理"}
           </div>
-          {run.status === "running" && (
-            <button onClick={() => window.location.reload()} className="p-2 rounded-xl hover:bg-white/50 transition-colors">
+          {isRunning && (
+            <button onClick={loadRun} className="p-2 rounded-xl hover:bg-white/50 transition-colors">
               <RefreshCw className="text-primary-500 animate-spin" size={20} />
             </button>
           )}
         </div>
 
+        {/* Progress tracker while running */}
+        {isRunning && (
+          <div className="mb-6">
+            <ProgressTracker runId={run.id} onComplete={handleProgressComplete} />
+          </div>
+        )}
+
+        {/* Error message */}
+        {run.status === "failed" && run.error_message && (
+          <div className="glass-card p-4 mb-6 bg-red-50">
+            <div className="flex items-start gap-2 text-red-700">
+              <AlertTriangle size={18} className="mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium">分析失败</p>
+                <p className="text-sm mt-1">{run.error_message}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Stats cards */}
         <div className="glass-card p-6 mb-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="text-center">
-              <p className="text-3xl font-bold text-primary-600">{run.total_reviews}</p>
+              <p className="text-3xl font-bold text-primary-600">{run.total_reviews || reviews.length}</p>
               <p className="text-sm text-gray-500">总评论数</p>
             </div>
             <div className="text-center">
-              <p className="text-3xl font-bold text-secondary-500">{run.cleaned_reviews}</p>
+              <p className="text-3xl font-bold text-secondary-500">{run.cleaned_reviews || reviews.length}</p>
               <p className="text-sm text-gray-500">已清洗</p>
             </div>
             <div className="text-center">
@@ -173,6 +199,22 @@ export const RunDetail = () => {
               <p className="text-sm text-gray-500">问题发现</p>
             </div>
           </div>
+          {findings.length > 0 && (assumptionCount > 0 || conflictCount > 0) && (
+            <div className="mt-4 pt-4 border-t border-gray-100 flex justify-center gap-6 text-sm">
+              {assumptionCount > 0 && (
+                <span className="text-yellow-600 flex items-center gap-1">
+                  <AlertTriangle size={14} />
+                  {assumptionCount} 项标记为假设
+                </span>
+              )}
+              {conflictCount > 0 && (
+                <span className="text-red-500 flex items-center gap-1">
+                  <ThumbsDown size={14} />
+                  {conflictCount} 项存在冲突证据
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
@@ -201,8 +243,8 @@ export const RunDetail = () => {
               <div>
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">分析摘要</h3>
                 <p className="text-gray-600 leading-relaxed">
-                  本次分析针对「{run.app_name}」进行了全面的用户评论分析。共采集 {run.total_reviews} 条评论，
-                  经过清洗后得到 {run.cleaned_reviews} 条有效评论。AI 模型识别出 {findings.length} 个核心问题，
+                  本次分析针对「{run.app_name}」进行了全面的用户评论分析。共采集 {run.total_reviews || reviews.length} 条评论，
+                  经过清洗后得到 {run.cleaned_reviews || reviews.length} 条有效评论。AI 模型识别出 {findings.length} 个核心问题，
                   并生成了 {requirements.length} 条产品需求和 {testCases.length} 条测试用例。
                 </p>
               </div>
@@ -258,24 +300,25 @@ export const RunDetail = () => {
                             />
                           ))}
                         </div>
-                        <span className="text-xs text-gray-500">{review.version}</span>
+                        {review.version && (
+                          <span className="text-xs text-gray-500">v{review.version}</span>
+                        )}
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded-full ${review.sentiment === "positive" ? "bg-green-100 text-green-600" : review.sentiment === "negative" ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-600"}`}>
-                        {review.sentiment === "positive" ? "正面" : review.sentiment === "negative" ? "负面" : "中性"}
-                      </span>
                     </div>
-                    <h4 className="font-medium text-gray-800 mb-1">{review.title}</h4>
-                    <p className="text-sm text-gray-600">{review.body}</p>
+                    {review.title && (
+                      <h4 className="font-medium text-gray-800 mb-1">{review.title}</h4>
+                    )}
+                    <p className="text-sm text-gray-600">{review.content}</p>
                     <div className="flex items-center justify-between mt-2">
                       <span className="text-xs text-gray-400">{review.author}</span>
-                      <span className="text-xs text-gray-400">{new Date(review.date).toLocaleDateString("zh-CN")}</span>
+                      {review.date && (
+                        <span className="text-xs text-gray-400">{new Date(review.date).toLocaleDateString("zh-CN")}</span>
+                      )}
                     </div>
                   </div>
                 ))}
                 {filteredReviews.length === 0 && (
-                  <div className="text-center py-12 text-gray-500">
-                    暂无评论数据
-                  </div>
+                  <div className="text-center py-12 text-gray-500">暂无评论数据</div>
                 )}
               </div>
             </div>
@@ -295,9 +338,22 @@ export const RunDetail = () => {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-gray-800">发现 #{finding.id}</span>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-primary-100 text-primary-600">
-                              置信度 {(finding.confidence * 100).toFixed(0)}%
-                            </span>
+                            {finding.finding_type && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-600">
+                                {finding.finding_type}
+                              </span>
+                            )}
+                            {finding.is_assumption && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 flex items-center gap-1">
+                                <AlertTriangle size={10} />
+                                假设
+                              </span>
+                            )}
+                            {finding.has_conflict && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600">
+                                存在冲突
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -310,9 +366,29 @@ export const RunDetail = () => {
                           <ThumbsDown size={14} />
                           {finding.conflicting_count}
                         </div>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-primary-100 text-primary-600">
+                          置信度 {((finding.confidence || 0) * 100).toFixed(0)}%
+                        </span>
                       </div>
                     </div>
-                    <p className="text-gray-600">{finding.description}</p>
+                    <p className="text-gray-600">{finding.finding_text}</p>
+                    {finding.evidence_review_ids && finding.evidence_review_ids.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <p className="text-xs text-gray-500 mb-1">证据评论 ID：</p>
+                        <div className="flex flex-wrap gap-1">
+                          {finding.evidence_review_ids.slice(0, 10).map((rid) => (
+                            <span key={rid} className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                              #{rid}
+                            </span>
+                          ))}
+                          {finding.evidence_review_ids.length > 10 && (
+                            <span className="text-xs text-gray-400">
+                              +{finding.evidence_review_ids.length - 10} 更多
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))
               ) : (
@@ -331,18 +407,40 @@ export const RunDetail = () => {
                   <div key={req.id} className="p-5 rounded-xl bg-white/50 border border-white/50">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <h4 className="font-medium text-gray-800">{req.title}</h4>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${req.priority === "high" ? "bg-red-100 text-red-600" : req.priority === "medium" ? "bg-yellow-100 text-yellow-600" : "bg-gray-100 text-gray-600"}`}>
-                            {req.priority === "high" ? "高优先级" : req.priority === "medium" ? "中优先级" : "低优先级"}
-                          </span>
+                        <h4 className="font-medium text-gray-800">{req.requirement_text}</h4>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          {req.priority && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              req.priority === "high" ? "bg-red-100 text-red-600"
+                              : req.priority === "medium" ? "bg-yellow-100 text-yellow-600"
+                              : "bg-gray-100 text-gray-600"
+                            }`}>
+                              {req.priority === "high" ? "高优先级" : req.priority === "medium" ? "中优先级" : "低优先级"}
+                            </span>
+                          )}
+                          {req.requirement_type && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-600">
+                              {req.requirement_type}
+                            </span>
+                          )}
                           <span className="text-xs px-2 py-0.5 rounded-full bg-primary-100 text-primary-600">
                             {req.version || "未分配版本"}
                           </span>
+                          {req.finding_id && (
+                            <span className="text-xs text-gray-500">来源发现 #{req.finding_id}</span>
+                          )}
                         </div>
                       </div>
                     </div>
-                    <p className="text-gray-600">{req.description}</p>
+                    {req.description && (
+                      <p className="text-gray-600 mt-2">{req.description}</p>
+                    )}
+                    {req.user_value && (
+                      <div className="mt-2 text-sm">
+                        <span className="text-gray-500">用户价值：</span>
+                        <span className="text-gray-700">{req.user_value}</span>
+                      </div>
+                    )}
                   </div>
                 ))
               ) : (
@@ -360,16 +458,40 @@ export const RunDetail = () => {
                 testCases.map((tc) => (
                   <div key={tc.id} className="p-5 rounded-xl bg-white/50 border border-white/50">
                     <div className="flex items-start justify-between mb-3">
-                      <h4 className="font-medium text-gray-800">{tc.title}</h4>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-secondary-100 text-secondary-600">
-                        TC #{tc.id}
-                      </span>
+                      <h4 className="font-medium text-gray-800">{tc.case_title}</h4>
+                      <div className="flex items-center gap-2">
+                        {tc.test_type && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-secondary-100 text-secondary-600">
+                            {tc.test_type}
+                          </span>
+                        )}
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                          TC #{tc.id}
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-gray-600 mb-3">{tc.description}</p>
-                    <div className="p-3 rounded-lg bg-gray-50">
+                    {tc.case_description && (
+                      <p className="text-gray-600 mb-3">{tc.case_description}</p>
+                    )}
+                    {tc.test_steps && tc.test_steps.length > 0 && (
+                      <div className="p-3 rounded-lg bg-gray-50 mb-3">
+                        <p className="text-sm font-medium text-gray-700 mb-1">测试步骤</p>
+                        <ol className="text-sm text-gray-600 list-decimal list-inside space-y-1">
+                          {tc.test_steps.map((step, i) => (
+                            <li key={i}>{step}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                    <div className="p-3 rounded-lg bg-green-50">
                       <p className="text-sm font-medium text-gray-700 mb-1">预期结果</p>
                       <p className="text-sm text-gray-600">{tc.expected_result}</p>
                     </div>
+                    {tc.requirement_id && (
+                      <div className="mt-2 text-xs text-gray-500">
+                        验证需求 #{tc.requirement_id}
+                      </div>
+                    )}
                   </div>
                 ))
               ) : (

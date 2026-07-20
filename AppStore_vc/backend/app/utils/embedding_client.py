@@ -10,6 +10,8 @@ class EmbeddingClient:
         self.client = OpenAI(
             api_key=settings.SILICONFLOW_API_KEY,
             base_url=settings.SILICONFLOW_BASE_URL,
+            timeout=60.0,       # 1 min timeout per embedding request
+            max_retries=2,
         )
         self.model = settings.EMBEDDING_MODEL
     
