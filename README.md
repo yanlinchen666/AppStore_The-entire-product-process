@@ -4,7 +4,7 @@
 > actionable product requirements, version plans, and test cases — with full
 > traceability from review to test case.
 
-This project implements the LaienTech "iOS App Review Analysis and Version
+This project implements  "iOS App Review Analysis and Version
 Planning Assessment". See the assessment requirements in the repository root
 [README.md](file:///d:/AI/agent_vc/AppStore_vc/README.md).
 
