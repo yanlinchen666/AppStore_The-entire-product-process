@@ -220,6 +220,4 @@ python -m app.cleanup_zombies --apply
 **Frontend**: React 18, TypeScript, Vite, TailwindCSS, Zustand, React Router, lucide-react
 **Optional**: Neo4j Community (graph features; automatically disabled if credentials are invalid or server is unreachable)
 
-## 📝 License
 
-This project is for the LaienTech evaluation.
